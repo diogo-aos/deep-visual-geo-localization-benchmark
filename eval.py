@@ -79,7 +79,7 @@ if args.off_the_shelf.startswith("radenovic") or args.off_the_shelf.startswith("
             state_dict_filename = "Resnet50-AP-GeM.pt"
         elif args.backbone == "resnet101conv5":
             state_dict_filename = "Resnet-101-AP-GeM.pt"
-        state_dict = torch.load(join("data", "off_the_shelf_nets", state_dict_filename))
+        state_dict = torch.load(join("data", "off_the_shelf_nets", state_dict_filename), weights_only=False)
     state_dict = state_dict["state_dict"]
     model_keys = model.state_dict().keys()
     renamed_state_dict = {k: v for k, v in zip(model_keys, state_dict.values())}

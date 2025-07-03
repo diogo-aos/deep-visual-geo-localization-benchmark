@@ -6,7 +6,7 @@ import torchvision
 from torch import nn
 from os.path import join
 from transformers import ViTModel
-from google_drive_downloader import GoogleDriveDownloader as gdd
+import googledrivedownloader as gdd
 
 from model.cct import cct_14_7x2_384
 from model.aggregation import Flatten
@@ -98,7 +98,7 @@ def get_pretrained_model(args):
     if not os.path.exists(file_path):
         gdd.download_file_from_google_drive(file_id=PRETRAINED_MODELS[model_name],
                                             dest_path=file_path)
-    state_dict = torch.load(file_path, map_location=torch.device('cpu'))
+    state_dict = torch.load(file_path, map_location=torch.device('cpu'), weights_only=True)
     model.load_state_dict(state_dict)
     return model
 
@@ -110,11 +110,11 @@ def get_backbone(args):
         if args.pretrain in ['places', 'gldv2']:
             backbone = get_pretrained_model(args)
         elif args.backbone.startswith("resnet18"):
-            backbone = torchvision.models.resnet18(pretrained=True)
+            backbone = torchvision.models.resnet18(pretrained=args.backbone_pretrain)
         elif args.backbone.startswith("resnet50"):
-            backbone = torchvision.models.resnet50(pretrained=True)
+            backbone = torchvision.models.resnet50(pretrained=args.backbone_pretrain)
         elif args.backbone.startswith("resnet101"):
-            backbone = torchvision.models.resnet101(pretrained=True)
+            backbone = torchvision.models.resnet101(pretrained=args.backbone_pretrain)
         for name, child in backbone.named_children():
             # Freeze layers before conv_3
             if name == "layer3":
@@ -131,20 +131,20 @@ def get_backbone(args):
         if args.pretrain in ['places', 'gldv2']:
             backbone = get_pretrained_model(args)
         else:
-            backbone = torchvision.models.vgg16(pretrained=True)
+            backbone = torchvision.models.vgg16(pretrained=args.backbone_pretrain)
         layers = list(backbone.features.children())[:-2]
         for l in layers[:-5]:
             for p in l.parameters(): p.requires_grad = False
         logging.debug("Train last layers of the vgg16, freeze the previous ones")
     elif args.backbone == "alexnet":
-        backbone = torchvision.models.alexnet(pretrained=True)
+        backbone = torchvision.models.alexnet(pretrained=args.backbone_pretrain)
         layers = list(backbone.features.children())[:-2]
         for l in layers[:5]:
             for p in l.parameters(): p.requires_grad = False
         logging.debug("Train last layers of the alexnet, freeze the previous ones")
     elif args.backbone.startswith("cct"):
         if args.backbone.startswith("cct384"):
-            backbone = cct_14_7x2_384(pretrained=True, progress=True, aggregation=args.aggregation)
+            backbone = cct_14_7x2_384(pretrained=args.backbone_pretrain, progress=True, aggregation=args.aggregation)
         if args.trunc_te:
             logging.debug(f"Truncate CCT at transformers encoder {args.trunc_te}")
             backbone.classifier.blocks = torch.nn.ModuleList(backbone.classifier.blocks[:args.trunc_te].children())

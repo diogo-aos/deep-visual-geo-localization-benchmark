@@ -11,8 +11,46 @@ from os.path import join
 import torch.utils.data as data
 import torchvision.transforms as T
 from torch.utils.data.dataset import Subset
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import NearestNeighbors as skNearestNeighbors
 from torch.utils.data.dataloader import DataLoader
+
+def unitsphere2earth(d: float):
+    return d * 6371000
+
+def earth2unitsphere(m: float):
+    return m / 6371000
+
+
+
+class NearestNeighborsWGS84:
+    def __init__(self, *args, **kwargs):
+        # input is supposed to be WGS84 coordinates, so metric should be haversine
+        # for a very good approximation of the distance between 2 points in earth surface
+        self.nn = skNearestNeighbors(*args, **kwargs, metric="haversine")
+    def fit(self, X, y=None):
+        # X is expected to be lat, lon deg
+        # convert to rads
+        # fit
+        self.nn.fit(np.deg2rad(X))
+
+    def radius_neighbors(self, X=None, radius=None, return_distance=True, sort_results=False):
+        # X is expected to be lat,lon degrees
+        # radius is expected to be in meters
+        ret = self.nn.radius_neighbors(
+            np.deg2rad(X),
+            radius=earth2unitsphere(radius),
+            return_distance=return_distance,
+            sort_results=sort_results)
+        if return_distance:
+            neigh_dist_meters = unitsphere2earth(ret[0])
+            return neigh_dist_meters, ret[1]
+        else:
+            return ret
+
+
+NearestNeighbors = NearestNeighborsWGS84
+        
+
 
 
 base_transform = T.Compose([
@@ -84,8 +122,8 @@ class BaseDataset(data.Dataset):
             raise FileNotFoundError(f"Folder {database_folder} does not exist")
         if not os.path.exists(queries_folder):
             raise FileNotFoundError(f"Folder {queries_folder} does not exist")
-        self.database_paths = sorted(glob(join(database_folder, "**", "*.jpg"), recursive=True))
-        self.queries_paths = sorted(glob(join(queries_folder, "**", "*.jpg"),  recursive=True))
+        self.database_paths = sorted(glob(join(database_folder, "**", "*.png"), recursive=True))
+        self.queries_paths = sorted(glob(join(queries_folder, "**", "*.png"),  recursive=True))
         # The format must be path/to/file/@utm_easting@utm_northing@...@.jpg
         self.database_utms = np.array([(path.split("@")[1], path.split("@")[2]) for path in self.database_paths]).astype(float)
         self.queries_utms = np.array([(path.split("@")[1], path.split("@")[2]) for path in self.queries_paths]).astype(float)
@@ -97,7 +135,16 @@ class BaseDataset(data.Dataset):
                                                              radius=args.val_positive_dist_threshold,
                                                              return_distance=False)
         
+        # get real paths of all paths in case they're symbolic links
+        # only do this after parsing label, as the symbolic links might
+        # exist only to conform with label format
+        self.database_paths = list(map(os.path.realpath, self.database_paths))
+        self.queries_paths = list(map(os.path.realpath, self.queries_paths))
+
+
         self.images_paths = list(self.database_paths) + list(self.queries_paths)
+
+        
         
         self.database_num = len(self.database_paths)
         self.queries_num = len(self.queries_paths)
@@ -187,9 +234,13 @@ class TripletsDataset(BaseDataset):
             logging.info(f"There are {len(queries_without_any_hard_positive)} queries without any positives " +
                          "within the training set. They won't be considered as they're useless for training.")
         # Remove queries without positives
-        self.hard_positives_per_query = np.delete(self.hard_positives_per_query, queries_without_any_hard_positive)
-        self.soft_positives_per_query = np.delete(self.soft_positives_per_query, queries_without_any_hard_positive)
-        self.queries_paths = np.delete(self.queries_paths, queries_without_any_hard_positive)
+        # this is the original - not working because rows have different lengths
+        # self.hard_positives_per_query = np.delete(self.hard_positives_per_query, queries_without_any_hard_positive)
+        # self.soft_positives_per_query = np.delete(self.soft_positives_per_query, queries_without_any_hard_positive)
+        # self.queries_paths = np.delete(self.queries_paths, queries_without_any_hard_positive)
+        self.hard_positives_per_query = [row for i,row in enumerate(self.hard_positives_per_query) if i not in queries_without_any_hard_positive]
+        self.soft_positives_per_query = [row for i,row in enumerate(self.soft_positives_per_query) if i not in queries_without_any_hard_positive]
+        self.queries_paths = [row for i,row in enumerate(self.queries_paths) if i not in queries_without_any_hard_positive]
         
         # Recompute images_paths and queries_num because some queries might have been removed
         self.images_paths = list(self.database_paths) + list(self.queries_paths)

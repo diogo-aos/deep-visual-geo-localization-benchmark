@@ -28,7 +28,7 @@ def save_checkpoint(args, state, is_best, filename):
 
 
 def resume_model(args, model):
-    checkpoint = torch.load(args.resume, map_location=args.device)
+    checkpoint = torch.load(args.resume, map_location=args.device, weights_only=False)
     if 'model_state_dict' in checkpoint:
         state_dict = checkpoint['model_state_dict']
     else:
@@ -46,7 +46,7 @@ def resume_model(args, model):
 def resume_train(args, model, optimizer=None, strict=False):
     """Load model, optimizer, and other training parameters"""
     logging.debug(f"Loading checkpoint: {args.resume}")
-    checkpoint = torch.load(args.resume)
+    checkpoint = torch.load(args.resume, weights_only=False)
     start_epoch_num = checkpoint["epoch_num"]
     model.load_state_dict(checkpoint["model_state_dict"], strict=strict)
     if optimizer:
