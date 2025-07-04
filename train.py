@@ -129,7 +129,7 @@ for epoch_num in range(start_epoch_num, args.epochs_num):
         
         # images shape: (train_batch_size*12)*3*H*W ; by default train_batch_size=4, H=480, W=640
         # triplets_local_indexes shape: (train_batch_size*10)*3 ; because 10 triplets per query
-        for images, triplets_local_indexes, _ in tqdm(triplets_dl, ncols=100):
+        for images, triplets_local_indexes, _ in tqdm(triplets_dl, ncols=20):
             
             # Flip all triplets or none
             if args.horizontal_flip:
@@ -210,7 +210,7 @@ logging.info(f"Best R@5: {best_r5:.1f}")
 logging.info(f"Trained for {epoch_num+1:02d} epochs, in total in {str(datetime.now() - start_time)[:-7]}")
 
 #### Test best model on test set
-best_model_state_dict = torch.load(join(args.save_dir, "best_model.pth"))["model_state_dict"]
+best_model_state_dict = torch.load(join(args.save_dir, "best_model.pth"), weights_only=False)["model_state_dict"]
 model.load_state_dict(best_model_state_dict)
 
 recalls, recalls_str = test.test(args, test_ds, model, test_method=args.test_method)

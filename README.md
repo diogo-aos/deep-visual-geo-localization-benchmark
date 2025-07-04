@@ -1,3 +1,6 @@
+- This is a fork of the [original repository](https://github.com/gmberton/deep-visual-geo-localization-benchmark/tree/main) to work with Pyhton 3.10 and newer versions of the dependencies.
+- It's using uv for managing dependencies and virtual envs.
+
 # Deep Visual Geo-localization Benchmark
 This is the official repository for the CVPR 2022 Oral paper [Deep Visual Geo-localization Benchmark](https://arxiv.org/abs/2204.03444).
 It can be used to reproduce results from the paper, and to compute a wide range of experiments, by changing the components of a Visual Geo-localization pipeline.
