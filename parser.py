@@ -13,7 +13,7 @@ def parse_arguments():
     parser.add_argument("--infer_batch_size", type=int, default=16,
                         help="Batch size for inference (caching and testing)")
     parser.add_argument("--criterion", type=str, default='triplet', help='loss to be used',
-                        choices=["triplet", "sare_ind", "sare_joint"])
+                        choices=["triplet", "sare_ind", "sare_joint", "TripletMarginLossWithMetricLearning"])
     parser.add_argument("--margin", type=float, default=0.1,
                         help="margin for the triplet loss")
     parser.add_argument("--epochs_num", type=int, default=1000,
@@ -36,6 +36,7 @@ def parse_arguments():
     parser.add_argument("--backbone", type=str, default="resnet18conv4",
                         choices=["alexnet", "vgg16", "resnet18conv4", "resnet18conv5",
                                  "resnet50conv4", "resnet50conv5", "resnet101conv4", "resnet101conv5",
+                                 "resnet152conv4", "resnet152conv5",
                                  "cct384", "vit"], help="_")
     parser.add_argument("--l2", type=str, default="before_pool", choices=["before_pool", "after_pool", "none"],
                         help="When (and if) to apply the l2 norm with shallow aggregation layers")
@@ -126,7 +127,8 @@ def parse_arguments():
             raise ValueError(f'Image size for CCT384 must be 384, but it is {args.resize}')
     
     if args.backbone in ["alexnet", "vgg16", "resnet18conv4", "resnet18conv5",
-                         "resnet50conv4", "resnet50conv5", "resnet101conv4", "resnet101conv5"]:
+                         "resnet50conv4", "resnet50conv5", "resnet101conv4", "resnet101conv5",
+                         "resnet152conv4", "resnet152conv5"]:
         if args.aggregation in ["cls", "seqpool"]:
             raise ValueError(f"CNNs like {args.backbone} can't work with aggregation {args.aggregation}")
     if args.backbone in ["cct384"]:

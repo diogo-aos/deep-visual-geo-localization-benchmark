@@ -35,28 +35,50 @@ import commons
 import datasets_ws
 from model import network
 from pathlib import Path
+from typing import Optional
+import pickle
 from easydict import EasyDict
+import json
+
+def parse_args_from_info(p: Path) -> dict:
+    with p.open() as f:
+        info_txt = f.readlines()
+    args_line = info_txt[0]
+    return parse_args_line(args_line)
 
 def parse_args_line(line: str) -> dict:
     line = line.strip()
-    start = line.find("(")
-    args_only = line[start+1:-1]
-    parts = args_only.split("=")
-    complete_str = "'" + parts[0] + "':"
+    if "Arguments: Namespace(" in line:
+        start = line.find("(")
+        args_only = line[start+1:-1]
+        parts = args_only.split("=")
+        complete_str = "'" + parts[0] + "':"
+        for part in parts[1:-1]:
+            split_ind = part.rfind(", ")
+            last_val = part[:split_ind]
+            new_key = part[split_ind+2:]
+            complete_str += last_val + ", '" + new_key + "': "
+        complete_str += parts[-1]
+        complete_str =  "{" + complete_str + "}"
+        d = eval(complete_str)
+        return d
+    elif "Arguments: {" in line:
+        # the args are already in a dict format
+        start = line.find("{")
+        args_only = line[start:].strip()
+        d = eval(args_only)
+        return d
 
-    for part in parts[1:-1]:
-        split_ind = part.rfind(", ")
-        last_val = part[:split_ind]
-        new_key = part[split_ind+2:]
-        complete_str += last_val + ", '" + new_key + "': "
-    complete_str += parts[-1]
-    complete_str =  "{" + complete_str + "}"
-    d = eval(complete_str)
-    return d
+    else:
+        raise ValueError("first line format not recognized")
+
+
 
 
 def eval_from_log(log_info_path: Path,
-                  dataset_dir: Path
+                  dataset_dir: Path,
+                  save_features: bool=False,
+                  infer_batch_size: Optional[int]=None,
                   ):
     save_dir = log_info_path.parent
     assert save_dir.exists()
@@ -71,12 +93,14 @@ def eval_from_log(log_info_path: Path,
         assert d.is_dir()
 
     # load train args, they're stored in the first line of info text file
-    with log_info_path.open() as f:
-        info_txt = f.readlines()
-    args_line = info_txt[0]
-    args_dict = parse_args_line(args_line)
+    args_dict = parse_args_from_info(log_info_path)
     args_dict["datasets_folder"] = str(dataset_dir.parent)
     args_dict["dataset_name"] = str(dataset_dir.name)
+    args_dict["resume"] = str(log_info_path.parent / "best_model.pth")
+
+    # override default args with received ones
+    if infer_batch_size is not None:
+        args_dict["infer_batch_size"] = infer_batch_size
 
     args = EasyDict(args_dict)
 
@@ -101,7 +125,7 @@ def eval_from_log(log_info_path: Path,
     args.save_dir = join("test", args.save_dir, start_time.strftime('%Y-%m-%d_%H-%M-%S'))
     commons.setup_logging(args.save_dir)
     commons.make_deterministic(args.seed)
-    logging.info(f"Arguments: {args}")
+    logging.info(f"Arguments: {json.dumps(args, indent=4)}")
     logging.info(f"The outputs are being saved in {args.save_dir}")
 
     ######################################### MODEL #########################################
@@ -151,7 +175,26 @@ def eval_from_log(log_info_path: Path,
     logging.info(f"Test set: {test_ds}")
 
     ######################################### TEST on TEST SET #########################################
-    recalls, recalls_str = test.test(args, test_ds, model, args.test_method, pca)
+    
+    if save_features:
+        recalls, recalls_str, Xq, Xd = test.test(args, test_ds, model, args.test_method, pca,
+                                                return_features=True)
+
+        logging.info("storing queries and database features")
+        with (Path(args.save_dir) / "features.pkl").open("wb") as f:
+            pickle.dump({
+                "R@1": recalls[0],
+                "R@5": recalls[1],
+                "R@10": recalls[2],
+                "R@20": recalls[3],
+                "queries": Xq,
+                "database": Xd
+            }, f)
+    else:
+        recalls, recalls_str = test.test(args, test_ds, model, args.test_method, pca,
+                                                return_features=False)
+
+
     logging.info(f"Recalls on {test_ds}: {recalls_str}")
 
     logging.info(f"Finished in {str(datetime.now() - start_time)[:-7]}")

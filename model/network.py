@@ -110,11 +110,13 @@ def get_backbone(args):
         if args.pretrain in ['places', 'gldv2']:
             backbone = get_pretrained_model(args)
         elif args.backbone.startswith("resnet18"):
-            backbone = torchvision.models.resnet18(pretrained=args.backbone_pretrain)
+            backbone = torchvision.models.resnet18(weights=args.backbone_pretrain)
         elif args.backbone.startswith("resnet50"):
-            backbone = torchvision.models.resnet50(pretrained=args.backbone_pretrain)
+            backbone = torchvision.models.resnet50(weights=args.backbone_pretrain)
         elif args.backbone.startswith("resnet101"):
-            backbone = torchvision.models.resnet101(pretrained=args.backbone_pretrain)
+            backbone = torchvision.models.resnet101(weights=args.backbone_pretrain)
+        elif args.backbone.startswith("resnet152"):
+            backbone = torchvision.models.resnet152(weights=args.backbone_pretrain)
         for name, child in backbone.named_children():
             # Freeze layers before conv_3
             if name == "layer3":

@@ -68,6 +68,9 @@ def setup_logging(save_dir, console="debug",
             console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(base_formatter)
         logger.addHandler(console_handler)
+
+    # PIL with
+    logging.getLogger('PIL').setLevel(logging.INFO)
     
     def exception_handler(type_, value, tb):
         logger.info("\n" + "".join(traceback.format_exception(type, value, tb)))
